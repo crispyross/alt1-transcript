@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<link rel="stylesheet" href="https://runeapps.org/nis/nis.css"/>
+		<link rel="stylesheet" href="https://runeapps.org/nis/alt1-currentskin/skinstyle.css"/>
+		<link rel="stylesheet" href="appstyles.css"/>
+		<title>RuneScape Transcriber</title>
+		<script src="./index.bundle.js"></script>
+	</head>
+	<body class="nis">
+		<div id="header">
+			<div id="ticktoggle" class="nisbutton2" onclick="_transcriber.toggletrack(); return false;">Track: on</div>
+			<div id="outputstyletoggle" class="nisbutton2" onclick="_transcriber.cycleOutputStyle(); return false;">Output style (readable)</div>
+		</div>
+		<div id="wrapper">
+			<div class="nisseperator"></div>
+			<pre id="dialog"></pre>
+			<div class="nisseperator"></div>
+			<pre id="info"></pre>
+			<div class="nisseperator"></div>
+			<pre id="debug"></pre>
+		</div>
+
+	</body>
+</html>
