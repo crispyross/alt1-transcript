@@ -20,7 +20,7 @@ export interface Option {
     y: number
 }
 
-export function readDialog(reader: DialogReader, img: ImgRef): Dialog|null {
+export function readDialog(reader: any, img: ImgRef): Dialog|null {
     const read = reader.read(img);
     if (read === null || read === false)
         return null;
@@ -33,7 +33,7 @@ export function readDialog(reader: DialogReader, img: ImgRef): Dialog|null {
         return {
             title: toTitleCase(read.title),
             options: read.opts.map((opt, i) => ({
-                text: opt.text,
+                text: opt.str,
                 index: i,
                 y: opt.y
             }))

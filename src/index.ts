@@ -1,5 +1,4 @@
 import * as a1 from "@alt1/base";
-import DialogReader from "@alt1/dialog"
 import {dialogsEqual, isOptionsDialog, Option, OptionsDialog, readDialog, TextDialog} from "./Dialog";
 import DialogTree, {DialogTreeNode, OutputStyle} from "./DialogTree";
 import Timeout = NodeJS.Timeout;
@@ -12,6 +11,12 @@ require("!file-loader?name=[name].[ext]!./index.html");
 require("!file-loader?name=[name].[ext]!./appconfig.json");
 require("!file-loader?name=[name].[ext]!./appstyles.css");
 
+require("!file-loader?name=[name].[ext]!../../alt1-legacy/runeappslib");
+require("!file-loader?name=[name].[ext]!../../alt1-legacy/imagedetect");
+require("!file-loader?name=[name].[ext]!../../alt1-legacy/alt1lib");
+require("!file-loader?name=[name].[ext]!../../alt1-legacy/ocr");
+require("!file-loader?name=[name].[ext]!../../alt1-legacy/dialogfull");
+
 let dialogHtml;
 let infoHtml;
 let debugHtml;
@@ -19,7 +24,8 @@ let styleCycleButton;
 let trackingButton;
 let wrapper;
 
-const reader = new DialogReader();
+declare var DialogFullReader: any;
+const reader = new DialogFullReader();
 let trees: DialogTree[] = [];
 let curTree: DialogTree|null = null;
 let curNode: DialogTreeNode|null = null;
