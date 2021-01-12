@@ -1,4 +1,4 @@
-import {TextDialog, OptionsDialog, Option, dialogsEqual, isTextDialog} from "./Dialog";
+import {TextDialog, OptionsDialog, Option, dialogsEqual, isTextDialog, Dialog} from "./Dialog";
 
 export enum OutputStyle {
     Readable, Wiki
@@ -12,19 +12,25 @@ export default class DialogTree {
     }
 
     find = (dlg): DialogTreeNode|null => this.root?.find(dlg) ?? null;
+    findOrAddDialog(dlg: Dialog, curNode: DialogTreeNode, selectedOption?: Option|null) {
+        if (this.root)
+            return this.root.findOrAddDialog(dlg, curNode, selectedOption)
+        this.root = new DialogTreeNode(dlg);
+        return this.root;
+    }
     toString = (style = OutputStyle.Readable) => this.root?.toString(style) ?? "";
 }
 
 export class DialogTreeNode {
-    dialog: TextDialog|OptionsDialog
+    dialog: Dialog
     children: DialogTreeNode[]
 
-    constructor(dialog: TextDialog|OptionsDialog) {
+    constructor(dialog: Dialog) {
         this.dialog = dialog;
         this.children = [];
     }
 
-    find(dlg: TextDialog|OptionsDialog): DialogTreeNode|null {
+    find(dlg: Dialog): DialogTreeNode|null {
         if (dialogsEqual(dlg, this.dialog))
             return this;
         for (const child of this.children) {
@@ -34,6 +40,20 @@ export class DialogTreeNode {
                 return found;
         }
         return null;
+    }
+
+    findOrAddDialog(dlg: Dialog, curNode: DialogTreeNode, selectedOption?: Option|null) {
+        // Check if dlg is a repeat within this conversation
+        const foundNode = this.find(dlg);
+        if (!foundNode) {
+            // Add dlg as new node
+            const index = selectedOption?.index ?? 0;
+            const newNode = new DialogTreeNode(dlg);
+            curNode.children[index] = newNode;
+            return newNode;
+        }
+        else
+            return foundNode;
     }
 
     toString(style: OutputStyle) {

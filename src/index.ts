@@ -3,6 +3,9 @@ import DialogReader from "@alt1/dialog"
 import {dialogsEqual, isOptionsDialog, Option, OptionsDialog, readDialog, TextDialog} from "./Dialog";
 import DialogTree, {DialogTreeNode, OutputStyle} from "./DialogTree";
 import Timeout = NodeJS.Timeout;
+import linq from "@tsdotnet/linq";
+import {orderBy} from "@tsdotnet/linq/dist/filters";
+import {first} from "@tsdotnet/linq/dist/resolutions";
 
 //tell webpack to add files to output
 require("!file-loader?name=[name].[ext]!./index.html");
@@ -13,25 +16,28 @@ let dialogHtml;
 let infoHtml;
 let debugHtml;
 let styleCycleButton;
+let trackingButton;
 let wrapper;
 
 const reader = new DialogReader();
 let trees: DialogTree[] = [];
-let curDlgTree: DialogTree|null = null;
-let curDlgNode: DialogTreeNode|null = null;
+let curTree: DialogTree|null = null;
+let curNode: DialogTreeNode|null = null;
 let selectedOption: Option|null = null;
 let lastProcessedDialog: TextDialog|OptionsDialog|null = null;
 let timesDialogNotFound = 0;
 
 let outputStyle = OutputStyle.Readable;
+let tracking = true;
 
-let selectOptionTimeout: Timeout|null = null;
+let checkOptionTimeout: Timeout|null = null;
 
 window.onload = function() {
 	infoHtml = document.getElementById("info");
 	dialogHtml = document.getElementById("dialog");
 	debugHtml = document.getElementById("debug");
-	styleCycleButton = document.getElementById("outputstyletoggle");
+	styleCycleButton = document.getElementById("outputStyleToggle");
+	trackingButton = document.getElementById("trackToggle")
 	wrapper = document.getElementById("wrapper");
 
 	if (!window.alt1) {
@@ -40,11 +46,12 @@ window.onload = function() {
 	}
 
 	a1.identifyApp("./appconfig.json");
-	window.setInterval(update, 1000);
+	window.setInterval(update, 500);
 }
 
-export function toggletrack() {
-	// TODO
+export function toggleTracking() {
+	tracking = !tracking;
+	trackingButton.innerText = "Track: " + (tracking ? "On" : "Off");
 }
 
 export function cycleOutputStyle() {
@@ -54,13 +61,18 @@ export function cycleOutputStyle() {
 	const idx = (cycle.indexOf(outputStyle) + 1) % cycle.length;
 	outputStyle = cycle[idx];
 	styleCycleButton.innerText = `Output Style (${buttonLabels[idx]})`;
-	updateOptionsDialog();
+	updateDialogOutput();
 }
 
 function update() {
+	if (!tracking)
+		return;
+
 	const oldScroll = wrapper.scrollTop;
 	const isScrolledToBottom = (wrapper.scrollTop === wrapper.scrollHeight - wrapper.clientHeight);
 
+	infoHtml.innerText = "";
+	debugHtml.innerText = "";
 	doUpdate();
 
 	if (isScrolledToBottom)
@@ -69,100 +81,77 @@ function update() {
 		wrapper.scrollTop = oldScroll;
 }
 
-function selectOption() {
-	const dlg = curDlgNode.dialog;
+function checkOption() {
+	const dlg = curNode?.dialog;
 	if (isOptionsDialog(dlg)) {
-		const mouseY = a1.getMousePosition().y;
-		let closestOpt = dlg.options[0];
-		for (const opt of dlg.options) {
-			if (Math.abs(mouseY - opt.y) < Math.abs(mouseY - closestOpt.y))
-				closestOpt = opt;
-		}
-		selectedOption = closestOpt;
+		const mouseY = a1.getMousePosition()?.y;
+		if (!mouseY)
+			return;
+
+		selectedOption = linq(dlg.options)
+			.filter(orderBy(opt => Math.abs(mouseY - opt.y)))
+			.resolve(first)
+
+		infoHtml.innerText = `Selected option: ${selectedOption.index + 1}. ${selectedOption.text}`;
 	}
 }
 
 function doUpdate() {
-	debugHtml.innerText = "";
-	debugHtml.innerText += 'curDlgNode: ' + JSON.stringify(curDlgNode) + '\n';
-	debugHtml.innerText += 'lastProcessedDialog: ' + JSON.stringify(lastProcessedDialog) + '\n';
-	debugHtml.innerText += 'selectedOption: ' + JSON.stringify(selectedOption) + '\n';
+	if (selectedOption)
+		infoHtml.innerText += `Selected option: ${selectedOption.index + 1}. ${selectedOption.text}`
 
-	const img = a1.captureHoldFullRs();
-	if (!img) {
-		debugHtml.innerText += "captureHoldFullRs failed\n";
-		return;
-	}
-
-	let pos = reader.find(img);
+	const screen = a1.captureHoldFullRs();
 	let dlg;
-	if (pos)
-		dlg = readDialog(reader, img);
-
-	if (!pos || !dlg) {
-		debugHtml.innerText += "Convo not found\n";
+	if (!reader.find(screen) || !(dlg = readDialog(reader, screen))) {
+		infoHtml.innerText += "No dialog found.\n";
 		if (++timesDialogNotFound > 3) {
-			debugHtml.innerText += "Conversation ended\n";
-			curDlgTree = null;
-			curDlgNode = null;
+			curTree = null;
+			curNode = null;
+			infoHtml.innerText += "Not currently in a conversation.\n";
 		}
 		return;
 	}
+
 	timesDialogNotFound = 0;
 
-	debugHtml.innerText += "dlg: " + JSON.stringify(dlg) + '\n';
-
-	if (lastProcessedDialog !== null && dialogsEqual(lastProcessedDialog, dlg)) {
+	if (dialogsEqual(lastProcessedDialog, dlg)) {
 		debugHtml.innerText += "Already processed dialog\n";
 		return;
 	}
 	lastProcessedDialog = dlg;
 
-	// This is a new dialog
-	if (selectOptionTimeout)
-		clearInterval(selectOptionTimeout);
+	if (checkOptionTimeout)
+		clearInterval(checkOptionTimeout);
 
-	if (curDlgTree === null) {
+	if (curTree === null) {
 		// Start of new conversation tree
 		// Check if dlg matches the start of any existing conversations
 		for (const tree of trees) {
-			if (dialogsEqual(tree.root?.dialog, dlg)) {
-				curDlgTree = tree;
-				curDlgNode = tree.root;
+			if (tree.root?.dialog && dialogsEqual(tree.root.dialog, dlg)) {
+				curTree = tree;
 				break;
 			}
 		}
 
 		// If no match found, make new tree
-		if (curDlgNode === null) {
-			curDlgNode = new DialogTreeNode(dlg);
-			curDlgTree = new DialogTree(curDlgNode);
-			trees.push(curDlgTree);
+		if (curTree === null) {
+			curTree = new DialogTree(new DialogTreeNode(dlg));
+			trees.push(curTree);
 		}
 	}
-	else {
-		// dlg is part of an ongoing conversation
-		// Check if dlg is a repeat within this conversation
-		const found = curDlgTree.find(dlg);
-		if (!found) {
-			// Add dlg as new node in tree
-			const index = selectedOption?.index ?? 0;
-			const node = new DialogTreeNode(dlg);
-			curDlgNode.children[index] = node;
-			curDlgNode = node;
-		}
-		else {
-			curDlgNode = found;
-		}
-	}
+
+	if (!curNode)
+		curNode = curTree.root;
+	else
+		curNode = curTree.findOrAddDialog(dlg, curNode, selectedOption);
 
 	selectedOption = null;
-	if (isOptionsDialog(curDlgNode.dialog))
-		selectOptionTimeout = setInterval(selectOption, 100);
+	if (isOptionsDialog(curNode?.dialog))
+		checkOptionTimeout = setInterval(checkOption, 100);
 
-	updateOptionsDialog();
+	updateDialogOutput();
 }
 
-function updateOptionsDialog() {
+function updateDialogOutput() {
 	dialogHtml.innerHTML = trees.map(t => t.toString(outputStyle)).join("\n\n\n");
 }

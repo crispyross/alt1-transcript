@@ -25,6 +25,7 @@
 		"@alt1/ability": "^0.0.10",
 		"@alt1/base": "^0.0.10",
 		"@alt1/dialog": "^0.0.10",
-		"@alt1/ocr": "^0.0.10"
+		"@alt1/ocr": "^0.0.10",
+		"@tsdotnet/linq": "^1.0.11"
 	}
 }

@@ -2,6 +2,8 @@ import DialogReader from "@alt1/dialog";
 import {arraysEqual, toTitleCase} from "./util";
 import {ImgRef} from "@alt1/base";
 
+export type Dialog = TextDialog | OptionsDialog;
+
 export interface TextDialog {
     title: string,
     text: string
@@ -18,7 +20,7 @@ export interface Option {
     y: number
 }
 
-export function readDialog(reader: DialogReader, img: ImgRef): TextDialog|OptionsDialog|null {
+export function readDialog(reader: DialogReader, img: ImgRef): Dialog|null {
     const read = reader.read(img);
     if (read === null || read === false)
         return null;
@@ -27,7 +29,7 @@ export function readDialog(reader: DialogReader, img: ImgRef): TextDialog|Option
             title: toTitleCase(read.title),
             text: read.text.join(" ")
         };
-    else
+    else if (read.opts)
         return {
             title: toTitleCase(read.title),
             options: read.opts.map((opt, i) => ({
@@ -36,19 +38,25 @@ export function readDialog(reader: DialogReader, img: ImgRef): TextDialog|Option
                 y: opt.y
             }))
         }
+    else
+        return null;
 }
 
 export function isTextDialog(obj: any): obj is TextDialog {
     const cast = obj as TextDialog;
-    return cast.title != null && cast.text != null;
+    return cast !== null && cast.title != null && cast.text != null;
 }
 
 export function isOptionsDialog(obj: any): obj is OptionsDialog {
     const cast = obj as OptionsDialog;
-    return cast.title != null && cast.options != null && cast.options.length > 1;
+    return cast !== null && cast.title != null && cast.options != null && cast.options.length > 1;
 }
 
-export function dialogsEqual(a: TextDialog|OptionsDialog, b:TextDialog|OptionsDialog): boolean {
+export function dialogsEqual(a: Dialog|null, b: Dialog|null): boolean {
+    if (a === null)
+        return b === null;
+    if (b === null)
+        return false;
     if (isTextDialog(a)) {
         if (!isTextDialog(b))
             return false;

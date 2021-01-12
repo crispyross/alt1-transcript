@@ -1,6 +1,10 @@
 {
 	"compilerOptions": {
-		"moduleResolution": "Node"
+		"moduleResolution": "Node",
+		"strictNullChecks": true,
+		"alwaysStrict": true,
+		"allowJs": true,
+		"pretty": true
 	},
 	"allowTsInNodeModules": true
 }
